@@ -176,8 +176,19 @@
         <div class="toc">
             <h3>目次</h3>
             <ul>
-                <li><a href="#grokking">Grokking現象とは</a></li>
-                <li><a href="#modular">モジュラー加算タスク</a></li>
+                <li><a href="#grokking">Grokking現象とは</a>
+                    <ul>
+                        <li>通常の学習との違い</li>
+                        <li>なぜ不思議なのか</li>
+                    </ul>
+                </li>
+                <li><a href="#modular">モジュラー加算タスク</a>
+                    <ul>
+                        <li>モジュラー演算とは（時計の例）</li>
+                        <li>なぜ足し算を学習させるのか</li>
+                        <li>素数を使う理由</li>
+                    </ul>
+                </li>
                 <li><a href="#fourier">フーリエ表現理論</a></li>
                 <li><a href="#visualization">可視化の見方</a></li>
                 <li><a href="#usage">使い方</a></li>
@@ -227,20 +238,78 @@
 
             <h2 id="modular">モジュラー加算タスク</h2>
 
-            <p>モジュラー演算は「割った余り」の演算です。</p>
+            <h3>モジュラー演算（剰余演算）とは</h3>
+            <p><strong>モジュラー演算</strong>は、ある数で割った「余り」を扱う演算です。日常生活では時計が最も身近な例です。</p>
 
             <pre><code>通常の加算:    5 + 3 = 8
-モジュラー加算: (5 + 3) mod 7 = 1  （8÷7の余り）
+モジュラー加算: (5 + 3) mod 7 = 1  （8÷7の余り）</code></pre>
 
-時計の例:
-現在10時、5時間後 → (10 + 5) mod 12 = 3時</code></pre>
+            <h3>時計で理解するモジュラー演算</h3>
+            <div style="background: #161b22; padding: 20px; border-radius: 8px; margin: 15px 0;">
+                <pre><code>🕙 現在 10時、3時間後は？
+   (10 + 3) mod 12 = 13 mod 12 = 1時
+
+🕙 現在 10時、5時間後は？
+   (10 + 5) mod 12 = 15 mod 12 = 3時
+
+🕘 現在 9時、15時間後は？
+   (9 + 15) mod 12 = 24 mod 12 = 0時（= 12時）</code></pre>
+            </div>
+            <p>12を超えると「巻き戻る」—これがモジュラー演算の本質です。</p>
+
+            <h3>なぜ「足し算」を学習させるのか</h3>
+            <table>
+                <tr>
+                    <th>理由</th>
+                    <th>説明</th>
+                </tr>
+                <tr>
+                    <td><strong>シンプルだが非自明</strong></td>
+                    <td>通常の足し算は線形だが、モジュラー加算は周期的で非線形性が必要</td>
+                </tr>
+                <tr>
+                    <td><strong>数学的に解析可能</strong></td>
+                    <td>フーリエ変換で厳密に解析でき、モデルが「何を学んだか」を検証できる</td>
+                </tr>
+                <tr>
+                    <td><strong>Grokkingが観察しやすい</strong></td>
+                    <td>小さなデータセットで記憶 vs 汎化の境界が明確</td>
+                </tr>
+            </table>
 
             <h3>本プロジェクトの設定</h3>
+            <div style="background: #161b22; padding: 20px; border-radius: 8px; margin: 15px 0;">
+                <pre><code>入力: (a, b) where a, b ∈ {0, 1, 2, ..., 96}
+出力: (a + b) mod 97
+
+具体例:
+  (50, 30) → 80       （50 + 30 = 80 < 97 なのでそのまま）
+  (50, 60) → 13       （50 + 60 = 110、110 mod 97 = 13）
+  (96,  1) → 0        （96 + 1 = 97、97 mod 97 = 0）</code></pre>
+            </div>
+
             <ul>
-                <li><strong>入力</strong>: (a, b) where a, b ∈ {0, ..., 96}</li>
-                <li><strong>出力</strong>: (a + b) mod 97</li>
-                <li><strong>訓練データ</strong>: 全ペアの30%</li>
+                <li><strong>p = 97</strong>（素数）— 周期構造が単純になる</li>
+                <li><strong>全ペア数</strong>: 97 × 97 = 9,409 通り</li>
+                <li><strong>訓練データ</strong>: 30%（約2,800ペア）</li>
+                <li><strong>テストデータ</strong>: 70%（約6,600ペア）</li>
             </ul>
+
+            <h3>なぜ素数 p = 97 を使うのか</h3>
+            <p>素数を使うと、モジュラー演算が<strong>巡回群</strong>を形成し、フーリエ解析と相性が良くなります。</p>
+            <div style="background: #161b22; padding: 20px; border-radius: 8px; margin: 15px 0;">
+                <pre><code>p=5 の場合の足し算テーブル:
+
+    + | 0  1  2  3  4
+   ---+---------------
+    0 | 0  1  2  3  4
+    1 | 1  2  3  4  0  ← 4+1=5、5 mod 5 = 0
+    2 | 2  3  4  0  1
+    3 | 3  4  0  1  2
+    4 | 4  0  1  2  3
+
+→ 全ての数が循環的に現れる（巡回群）</code></pre>
+            </div>
 
             <hr>
 
