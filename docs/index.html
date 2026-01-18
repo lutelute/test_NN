@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grokking Visualization - Technical Note</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.2.0/github-markdown.min.css">
+    <style>
+        body {
+            background-color: #0d1117;
+            color: #c9d1d9;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 980px;
+            margin: 0 auto;
+            padding: 45px;
+        }
+        .markdown-body {
+            background-color: #0d1117;
+            color: #c9d1d9;
+        }
+        .markdown-body h1, .markdown-body h2, .markdown-body h3 {
+            border-bottom-color: #21262d;
+            color: #f0f6fc;
+        }
+        .markdown-body code {
+            background-color: #161b22;
+            color: #c9d1d9;
+        }
+        .markdown-body pre {
+            background-color: #161b22;
+            border: 1px solid #30363d;
+        }
+        .markdown-body table {
+            border-collapse: collapse;
+        }
+        .markdown-body table th, .markdown-body table td {
+            border: 1px solid #30363d;
+            padding: 8px 12px;
+        }
+        .markdown-body table tr {
+            background-color: #0d1117;
+        }
+        .markdown-body table tr:nth-child(2n) {
+            background-color: #161b22;
+        }
+        .markdown-body blockquote {
+            border-left-color: #3b5998;
+            color: #8b949e;
+        }
+        .markdown-body a {
+            color: #58a6ff;
+        }
+        .markdown-body hr {
+            background-color: #21262d;
+        }
+        .header {
+            text-align: center;
+            padding: 40px 0;
+            border-bottom: 1px solid #21262d;
+            margin-bottom: 40px;
+        }
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        .header p {
+            color: #8b949e;
+            font-size: 1.2em;
+        }
+        .animation-demo {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 12px;
+            padding: 30px;
+            margin: 30px 0;
+            text-align: center;
+        }
+        .animation-demo h3 {
+            color: white;
+            margin-top: 0;
+        }
+        .circle-animation {
+            width: 200px;
+            height: 200px;
+            margin: 20px auto;
+            position: relative;
+        }
+        .dot {
+            width: 8px;
+            height: 8px;
+            background: white;
+            border-radius: 50%;
+            position: absolute;
+            animation: orbit 4s linear infinite;
+        }
+        @keyframes orbit {
+            from { transform: rotate(0deg) translateX(80px) rotate(0deg); }
+            to { transform: rotate(360deg) translateX(80px) rotate(-360deg); }
+        }
+        .dot:nth-child(1) { animation-delay: 0s; }
+        .dot:nth-child(2) { animation-delay: 0.2s; }
+        .dot:nth-child(3) { animation-delay: 0.4s; }
+        .dot:nth-child(4) { animation-delay: 0.6s; }
+        .dot:nth-child(5) { animation-delay: 0.8s; }
+        .dot:nth-child(6) { animation-delay: 1.0s; }
+        .dot:nth-child(7) { animation-delay: 1.2s; }
+        .dot:nth-child(8) { animation-delay: 1.4s; }
+        .toc {
+            background-color: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .toc h3 {
+            margin-top: 0;
+            color: #f0f6fc;
+        }
+        .toc ul {
+            list-style: none;
+            padding-left: 0;
+        }
+        .toc li {
+            padding: 5px 0;
+        }
+        .toc a {
+            color: #58a6ff;
+            text-decoration: none;
+        }
+        .toc a:hover {
+            text-decoration: underline;
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            margin-right: 8px;
+        }
+        .badge-python { background-color: #3776ab; color: white; }
+        .badge-pytorch { background-color: #ee4c2c; color: white; }
+        .badge-streamlit { background-color: #ff4b4b; color: white; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Grokking Visualization</h1>
+            <p>ニューラルネットワークの「突然の理解」を可視化する</p>
+            <div>
+                <span class="badge badge-python">Python</span>
+                <span class="badge badge-pytorch">PyTorch</span>
+                <span class="badge badge-streamlit">Streamlit</span>
+            </div>
+        </div>
+
+        <div class="animation-demo">
+            <h3>Fourier Representation - 円環構造</h3>
+            <div class="circle-animation">
+                <div class="dot"></div>
+                <div class="dot"></div>
+                <div class="dot"></div>
+                <div class="dot"></div>
+                <div class="dot"></div>
+                <div class="dot"></div>
+                <div class="dot"></div>
+                <div class="dot"></div>
+            </div>
+            <p style="color: rgba(255,255,255,0.8);">Grokking後、モデルは数値を円環上に配置するフーリエ表現を学習</p>
+        </div>
+
+        <div class="toc">
+            <h3>目次</h3>
+            <ul>
+                <li><a href="#grokking">Grokking現象とは</a></li>
+                <li><a href="#modular">モジュラー加算タスク</a></li>
+                <li><a href="#fourier">フーリエ表現理論</a></li>
+                <li><a href="#visualization">可視化の見方</a></li>
+                <li><a href="#usage">使い方</a></li>
+            </ul>
+        </div>
+
+        <article class="markdown-body">
+            <h2 id="grokking">Grokking現象とは</h2>
+
+            <p><strong>Grokking</strong>（グロッキング）は、SF作家ロバート・A・ハインラインの小説『異星の客』(1961) に登場する火星語で、「深く直感的に理解する」という意味です。</p>
+
+            <p>機械学習では、<strong>過学習状態が長期間続いた後、突然汎化が起こる現象</strong>を指します。</p>
+
+            <h3>通常の学習 vs Grokking</h3>
+
+            <table>
+                <tr>
+                    <th>フェーズ</th>
+                    <th>通常の学習</th>
+                    <th>Grokking</th>
+                </tr>
+                <tr>
+                    <td>初期</td>
+                    <td>Train/Test共に上昇</td>
+                    <td>Trainのみ上昇</td>
+                </tr>
+                <tr>
+                    <td>中期</td>
+                    <td>両方が収束</td>
+                    <td>Train 100%, Test ~0%</td>
+                </tr>
+                <tr>
+                    <td>後期</td>
+                    <td>（終了）</td>
+                    <td>突然 Test が急上昇!</td>
+                </tr>
+            </table>
+
+            <h3>なぜ不思議なのか</h3>
+            <ul>
+                <li><strong>過学習 = 悪</strong>という常識に反する</li>
+                <li><strong>早期停止</strong>したら汎化しない</li>
+                <li>訓練100%のずっと後にテスト精度が上がる</li>
+            </ul>
+
+            <hr>
+
+            <h2 id="modular">モジュラー加算タスク</h2>
+
+            <p>モジュラー演算は「割った余り」の演算です。</p>
+
+            <pre><code>通常の加算:    5 + 3 = 8
+モジュラー加算: (5 + 3) mod 7 = 1  （8÷7の余り）
+
+時計の例:
+現在10時、5時間後 → (10 + 5) mod 12 = 3時</code></pre>
+
+            <h3>本プロジェクトの設定</h3>
+            <ul>
+                <li><strong>入力</strong>: (a, b) where a, b ∈ {0, ..., 96}</li>
+                <li><strong>出力</strong>: (a + b) mod 97</li>
+                <li><strong>訓練データ</strong>: 全ペアの30%</li>
+            </ul>
+
+            <hr>
+
+            <h2 id="fourier">フーリエ表現理論</h2>
+
+            <p>Grokking後、モデルは数値を<strong>フーリエ基底</strong>で埋め込みます：</p>
+
+            <pre><code>e(n) ≈ [cos(2πkn/p), sin(2πkn/p)]</code></pre>
+
+            <p>この表現では、数値が<strong>円周上</strong>に等間隔で配置されます。</p>
+
+            <hr>
+
+            <h2 id="visualization">可視化の見方</h2>
+
+            <h3>1. 円環構造（左パネル）</h3>
+            <table>
+                <tr>
+                    <th>状態</th>
+                    <th>見た目</th>
+                    <th>Circle値</th>
+                </tr>
+                <tr>
+                    <td>学習初期</td>
+                    <td>ランダムな散らばり</td>
+                    <td>&lt; 0.3</td>
+                </tr>
+                <tr>
+                    <td>記憶段階</td>
+                    <td>不規則なクラスタ</td>
+                    <td>0.3 - 0.7</td>
+                </tr>
+                <tr>
+                    <td>Grokking後</td>
+                    <td>きれいな円環</td>
+                    <td>&gt; 0.9</td>
+                </tr>
+            </table>
+
+            <h3>2. ニューロン相関行列（7×7グリッド）</h3>
+            <ul>
+                <li><strong>円形パターン</strong>: cos/sinペア（フーリエ基底）</li>
+                <li><strong>直線パターン</strong>: 強い相関</li>
+                <li><strong>ランダム散布</strong>: 独立した次元</li>
+            </ul>
+
+            <h3>3. 学習曲線</h3>
+            <ul>
+                <li><strong>青線</strong>: Train Accuracy</li>
+                <li><strong>赤線</strong>: Test Accuracy</li>
+                <li><strong>黄色縦線</strong>: 現在のエポック</li>
+            </ul>
+
+            <hr>
+
+            <h2 id="usage">使い方</h2>
+
+            <h3>インストール</h3>
+            <pre><code>git clone https://github.com/lutelute/test_NN.git
+cd test_NN
+pip install -r requirements.txt</code></pre>
+
+            <h3>学習の実行</h3>
+            <pre><code># 10エポック刻みで学習
+python train_grokking_demo.py --linear --save_interval 10
+
+# 2エポック刻みで詳細学習
+python train_grokking_demo.py --linear --save_interval 2 --checkpoint_dir checkpoints_demo_2ep</code></pre>
+
+            <h3>可視化ダッシュボード</h3>
+            <pre><code>streamlit run interactive_dashboard.py</code></pre>
+
+            <p>ブラウザで <code>http://localhost:8501</code> を開く</p>
+
+            <hr>
+
+            <h2>参考文献</h2>
+            <ol>
+                <li>Power, A., et al. (2022). "Grokking: Generalization Beyond Overfitting on Small Algorithmic Datasets"</li>
+                <li>Neel Nanda et al. (2023). "Progress measures for grokking via mechanistic interpretability"</li>
+            </ol>
+
+            <hr>
+
+            <p style="text-align: center; color: #8b949e;">
+                <a href="https://github.com/lutelute/test_NN">GitHub Repository</a> |
+                <a href="https://github.com/lutelute/test_NN/blob/main/TECHNICAL_NOTE.md">Full Technical Note</a>
+            </p>
+        </article>
+    </div>
+</body>
+</html>
