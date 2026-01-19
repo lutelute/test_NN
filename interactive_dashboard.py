@@ -1034,6 +1034,29 @@ def main():
                         first_ep = sampled_epochs[0]
                         first_data = epoch_data.get(first_ep, {})
 
+                        # 全エポックから軸の範囲を計算（固定用）
+                        all_proj_x, all_proj_y = [], []
+                        all_pooled = [[] for _ in range(grid_size)]
+                        for ep_data in epoch_data.values():
+                            proj = ep_data["proj_2d"]
+                            pooled = ep_data["pooled"]
+                            all_proj_x.extend(proj[:, 0].tolist())
+                            all_proj_y.extend(proj[:, 1].tolist())
+                            for i in range(min(grid_size, pooled.shape[1])):
+                                all_pooled[i].extend(pooled[:, i].tolist())
+
+                        # 軸範囲を計算（10%マージン）
+                        def calc_range(data):
+                            if not data:
+                                return [-1, 1]
+                            mn, mx = min(data), max(data)
+                            margin = (mx - mn) * 0.1 + 0.01
+                            return [mn - margin, mx + margin]
+
+                        proj_x_range = calc_range(all_proj_x)
+                        proj_y_range = calc_range(all_proj_y)
+                        pooled_ranges = [calc_range(d) for d in all_pooled]
+
                         # 学習曲線データ
                         epochs_list = list(range(1, len(history["train_acc"]) + 1))
                         train_acc = [a * 100 for a in history["train_acc"]]
@@ -1134,7 +1157,11 @@ def main():
                             ))
 
                             slider_steps.append({
-                                "args": [[str(ep)], {"frame": {"duration": 150, "redraw": True}, "mode": "immediate"}],
+                                "args": [[str(ep)], {
+                                    "frame": {"duration": 100, "redraw": False},
+                                    "transition": {"duration": 50, "easing": "linear"},
+                                    "mode": "immediate"
+                                }],
                                 "label": str(ep),
                                 "method": "animate"
                             })
@@ -1240,7 +1267,12 @@ def main():
                                 "y": -0.15,
                                 "x": 0.05,
                                 "buttons": [
-                                    {"label": "▶ 再生", "method": "animate", "args": [None, {"frame": {"duration": 150, "redraw": True}, "fromcurrent": True}]},
+                                    {"label": "▶ 再生", "method": "animate", "args": [None, {
+                                        "frame": {"duration": 100, "redraw": False},
+                                        "transition": {"duration": 50, "easing": "linear"},
+                                        "fromcurrent": True,
+                                        "mode": "immediate"
+                                    }]},
                                     {"label": "⏸ 停止", "method": "animate", "args": [[None], {"frame": {"duration": 0, "redraw": False}, "mode": "immediate"}]}
                                 ]
                             }],
@@ -1251,13 +1283,23 @@ def main():
                                 "len": 0.75,
                                 "y": -0.08,
                                 "currentvalue": {"prefix": "Epoch: ", "visible": True, "xanchor": "center"},
-                                "transition": {"duration": 100}
+                                "transition": {"duration": 50, "easing": "linear"}
                             }]
                         )
 
-                        # 軸設定
+                        # 軸設定（固定範囲で滑らかなアニメーション）
                         fig.update_xaxes(showticklabels=False, showgrid=False)
                         fig.update_yaxes(showticklabels=False, showgrid=False)
+
+                        # 円環プロットの軸を固定
+                        fig.update_xaxes(range=proj_x_range, row=1, col=1)
+                        fig.update_yaxes(range=proj_y_range, row=1, col=1)
+
+                        # 相関行列の軸を固定
+                        for i in range(grid_size):
+                            for j in range(grid_size):
+                                fig.update_xaxes(range=pooled_ranges[j], row=i+1, col=j+2)
+                                fig.update_yaxes(range=pooled_ranges[i], row=i+1, col=j+2)
 
                         # 学習曲線の軸は表示
                         last_row_idx = grid_size + 1
