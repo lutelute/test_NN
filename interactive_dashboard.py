@@ -837,9 +837,20 @@ def main():
             fig_spectrum, dominant = plot_fourier_spectrum(analyzer)
             st.plotly_chart(fig_spectrum, use_container_width=True)
 
+            st.markdown("""
+<div style="background: rgba(255, 215, 0, 0.15); padding: 10px; border-radius: 8px; border-left: 4px solid #FFD700; margin-bottom: 10px;">
+<b>📊 パワー値の判定基準:</b><br>
+• <b>power ≥ 0.3</b>: ✅ 強い周波数成分（学習済み）<br>
+• <b>0.1 ≤ power < 0.3</b>: 🟡 中程度の成分<br>
+• <b>power < 0.1</b>: 弱い成分<br><br>
+💡 特定のk（特にk=1〜5程度）にピークがあると良い
+</div>
+""", unsafe_allow_html=True)
+
             st.markdown("**Dominant Frequencies:**")
             for freq, power in dominant[:5]:
-                st.markdown(f"- k={freq}: power={power:.4f}")
+                status = "✅" if power >= 0.3 else ("🟡" if power >= 0.1 else "")
+                st.markdown(f"- k={freq}: power={power:.4f} {status}")
 
         with col2:
             st.subheader("Embedding Circle")
@@ -855,6 +866,19 @@ def main():
             - Fourier Representation: {is_fourier} (corr={fourier_result['best_correlation']:.3f})
             - Circular Structure: {is_circular} (corr={circular_result['angle_correlation']:.3f})
             """)
+
+            # 動的判定メッセージ
+            fourier_corr = fourier_result['best_correlation']
+            circular_corr = circular_result['angle_correlation']
+
+            if fourier_corr >= 0.9 and circular_corr >= 0.9:
+                st.success("✅ 優秀: フーリエ表現と円環構造の両方が高品質で学習されています！")
+            elif fourier_corr >= 0.7 and circular_corr >= 0.5:
+                st.info("🟡 良好: Grokkingが概ね成功していますが、さらに学習を続けると改善する可能性があります")
+            elif fourier_corr >= 0.7 or circular_corr >= 0.5:
+                st.warning("⚠️ 部分的: 一部の指標は良好ですが、完全なGrokkingには至っていません")
+            else:
+                st.error("❌ 不十分: フーリエ表現がまだ学習されていません。学習を継続するか、ハイパーパラメータを調整してください")
 
         st.markdown("---")
 
@@ -1400,29 +1424,30 @@ $$\cos(2\pi \cdot 5/5) = (-0.81)(-0.81) - (0.59)(-0.59) = 0.66 + 0.35 = 1.0 = \c
         # 解説
         with st.expander("📚 アニメーションの見方", expanded=False):
             st.markdown("""
-            **Epoch Slider** では、学習の各エポックでモデルの内部表現がどう変化するかをアニメーションで確認できます。
+### 画面構成
 
-            ### 表示内容
-            | パネル | 内容 |
-            |--------|------|
-            | **円環プロット** | 各 (a+b) mod p の値の内部表現を2Dに射影 |
-            | **学習曲線** | Train/Test精度の推移（現在位置を表示） |
-            | **ニューロン相関** | フーリエ次元間の相関行列 |
+| 位置 | 内容 | 見るべきポイント |
+|:---:|:-----|:----------------|
+| **左** | 円環プロット | (a+b) mod p の値を2D射影。**円形 = フーリエ学習完了** |
+| **右上** | ニューロン相関 | フーリエ次元間の相関行列。**対角線以外が低い = 良い** |
+| **下** | 学習曲線 | Train/Test精度。**Test急上昇 = Grokking** |
 
-            ### アニメーションの操作
-            - **▶️ Play**: アニメーション再生
-            - **⏸️ Pause**: 一時停止
-            - **スライダー**: 任意のエポックにジャンプ
+### 3つのフェーズ
 
-            ### 見るべきポイント
-            1. **初期**: 点がランダムに分布
-            2. **記憶フェーズ**: Train精度↑、Test精度は低いまま
-            3. **Grokking**: Test精度が急上昇、円環が形成される
-            4. **最終状態**: きれいな円環 + 高い角度相関
+| フェーズ | 特徴 | 円環の状態 |
+|:-------:|:-----|:----------|
+| **1️⃣ 初期** | Train/Test共に低い | ランダムな点群 |
+| **2️⃣ 記憶** | Train↑、Test低いまま | 点群が動き始める |
+| **3️⃣ Grokking** | Test急上昇 | **円環が形成される** ✅ |
 
-            ### 検出次元について
-            - **cos次元/sin次元**: 最終モデルで検出したフーリエペア
-            - この次元ペアを全エポックで固定して追跡
+### 操作方法
+- **▶️ Play**: アニメーション再生
+- **⏸️ Pause**: 一時停止
+- **スライダー**: 任意のエポックにジャンプ
+
+### 色の意味
+- 円環の点: 虹色グラデーション（色 = (a+b) mod p の値）
+- 赤い縦線: 現在のエポック位置
             """)
 
         if os.path.exists(history_path):
@@ -2019,6 +2044,19 @@ $$\cos(2\pi \cdot 5/5) = (-0.81)(-0.81) - (0.59)(-0.59) = 0.66 + 0.35 = 1.0 = \c
         $$\\cos(\\omega(a+b)) = \\cos(\\omega a)\\cos(\\omega b) - \\sin(\\omega a)\\sin(\\omega b)$$
         """)
 
+        # 全体フロー表
+        st.info("""
+### 📋 このタブの見方（5つのセクション）
+
+| セクション | 目的 | 見るべきポイント |
+|:--------:|:-----|:----------------|
+| **1️⃣ 計算フロー** | Transformerの処理ステップを理解 | 各ステップの数値が正しく計算されているか、最終的に加法定理が成立しているか |
+| **2️⃣ 3D表面** | cos·cos, sin·sin, cos(x+y)の可視化 | 左2つを引き算すると右のパターンになることを確認（**斜め縞模様**が良い状態） |
+| **3️⃣ ニューロン波形** | 実際のニューロンが理論通りか検証 | ニューロン出力（実線）と理論波形（破線）の**相関が高いほど良い** |
+| **4️⃣ リサージュ** | cos/sinニューロンの位相関係 | **円形・楕円形 = 良い**（フーリエ表現を学習）、**不規則 = 悪い** |
+| **5️⃣ バーチャート** | 加法定理の各項を視覚化 | LHS（左辺）とRHS（右辺）が**一致すれば**加法定理成立 |
+        """)
+
         p = config["p"]
 
         # 周波数選択
@@ -2095,6 +2133,16 @@ $$\cos(2\pi \cdot 5/5) = (-0.81)(-0.81) - (0.59)(-0.59) = 0.66 + 0.35 = 1.0 = \c
         # --- セクション2: 3D表面比較 ---
         st.subheader("2️⃣ 3D表面: cos·cos, sin·sin, cos(x+y)")
 
+        st.markdown("""
+<div style="background: rgba(255, 215, 0, 0.15); padding: 12px; border-radius: 8px; border-left: 4px solid #FFD700; margin-bottom: 15px;">
+<b>🔍 見方:</b><br>
+• <b>左 (cos·cos)</b>: 横縞と縦縞の組み合わせ<br>
+• <b>中央 (sin·sin)</b>: 左と同様だが位相がずれている<br>
+• <b>右 (cos(x+y))</b>: 左 − 中央 の結果 → <b>斜め45°の縞模様</b>になる<br><br>
+💡 <b>ポイント</b>: 右の図が斜め縞なら、加法定理が幾何学的に成り立っていることを確認できます
+</div>
+""", unsafe_allow_html=True)
+
         # 軽量化: グリッドサイズを制限
         grid_size = min(30, p)
         X, Y = np.meshgrid(np.arange(grid_size), np.arange(grid_size))
@@ -2133,6 +2181,18 @@ $$\cos(2\pi \cdot 5/5) = (-0.81)(-0.81) - (0.59)(-0.59) = 0.66 + 0.35 = 1.0 = \c
 
         # --- セクション3: ニューロン波形比較 ---
         st.subheader("3️⃣ ニューロン波形 vs 理論的cos/sin")
+
+        st.markdown("""
+<div style="background: rgba(78, 205, 196, 0.15); padding: 12px; border-radius: 8px; border-left: 4px solid #4ECDC4; margin-bottom: 15px;">
+<b>🔍 見方:</b><br>
+• <b>実線（黄/ピンク）</b>: モデルが実際に学習したニューロンの出力<br>
+• <b>破線（緑）</b>: 理論的なcos/sin波形<br><br>
+<b>📊 相関値の判定基準:</b><br>
+• <b>corr ≥ 0.9</b>: ✅ 優秀（ほぼ完璧にフーリエ表現を学習）<br>
+• <b>0.7 ≤ corr < 0.9</b>: 🟡 良好（フーリエ表現を概ね学習）<br>
+• <b>corr < 0.7</b>: ❌ 不十分（他の周波数を試すか、学習が不足している可能性）
+</div>
+""", unsafe_allow_html=True)
 
         x_vals = np.arange(p)
 
@@ -2193,6 +2253,16 @@ $$\cos(2\pi \cdot 5/5) = (-0.81)(-0.81) - (0.59)(-0.59) = 0.66 + 0.35 = 1.0 = \c
             # --- セクション4: リサージュ図形 ---
             st.subheader("4️⃣ リサージュ図形（cos vs sin ニューロン）")
 
+            st.markdown("""
+<div style="background: rgba(102, 126, 234, 0.15); padding: 12px; border-radius: 8px; border-left: 4px solid #667EEA; margin-bottom: 15px;">
+<b>🔍 リサージュ図形の解釈:</b><br>
+• <b>円形/楕円形</b>: ✅ 良い状態 - cos/sinが90°位相差で正しく学習されている<br>
+• <b>直線</b>: 🟡 注意 - cos/sinが同位相（または逆位相）になっている<br>
+• <b>不規則/散乱</b>: ❌ 悪い状態 - フーリエ表現が学習されていない<br><br>
+💡 <b>色の意味</b>: 虹色グラデーションは入力値xの変化を表します（赤→紫で0→p-1）
+</div>
+""", unsafe_allow_html=True)
+
             lissajous_fig = go.Figure()
             lissajous_fig.add_trace(go.Scatter(
                 x=cos_neuron_norm, y=sin_neuron_norm,
@@ -2216,6 +2286,16 @@ $$\cos(2\pi \cdot 5/5) = (-0.81)(-0.81) - (0.59)(-0.59) = 0.66 + 0.35 = 1.0 = \c
         # --- セクション5: 加法定理検証バーチャート ---
         st.subheader("5️⃣ 加法定理の検証（バーチャート）")
 
+        st.markdown("""
+<div style="background: rgba(255, 107, 107, 0.15); padding: 12px; border-radius: 8px; border-left: 4px solid #FF6B6B; margin-bottom: 15px;">
+<b>🔍 見方:</b><br>
+• <b>青 (cos/sin)</b>: 入力a, bのフーリエ成分<br>
+• <b>黄/橙 (cos·cos/sin·sin)</b>: 中間計算（Attentionで計算される積）<br>
+• <b>緑 (LHS/RHS)</b>: 左辺 cos(ω(a+b)) と 右辺 cos·cos - sin·sin<br><br>
+<b>✅ 成功条件</b>: LHSとRHSの値が<b>完全に一致</b>（差が1e-10以下）
+</div>
+""", unsafe_allow_html=True)
+
         terms = ["cos(ωa)", "cos(ωb)", "sin(ωa)", "sin(ωb)", "cos·cos", "sin·sin", "LHS", "RHS"]
         values = [cos_a, cos_b, sin_a, sin_b, cos_cos, sin_sin, result_direct, result_fourier]
         colors = ["#667EEA", "#667EEA", "#F5576C", "#F5576C", "#FFD700", "#FFA500", "#4ECDC4", "#4ECDC4"]
@@ -2233,36 +2313,342 @@ $$\cos(2\pi \cdot 5/5) = (-0.81)(-0.81) - (0.59)(-0.59) = 0.66 + 0.35 = 1.0 = \c
     with tab7:
         st.header("🔍 Attention Analysis")
 
+        # ===== モデル構造の概略図 =====
+        with st.expander("🏗️ モデル構造の概略図", expanded=True):
+            d_model = config.get("d_model", 128)
+            n_heads = config.get("n_heads", 4)
+            n_tokens = config.get("n_tokens", 2)
+            d_ff = config.get("d_ff", d_model * 4)
+            p = config["p"]
+
+            # 元画像を表示
+            config_img_path = "説明用fig/config.png"
+            if os.path.exists(config_img_path):
+                st.image(config_img_path, caption="モデルアーキテクチャ（参考図）", use_container_width=True)
+
+            # 横型フロー図（config.pngを再現）
+            st.markdown(f"""
+<div style="background: #000; padding: 20px; border-radius: 15px; overflow-x: auto;">
+
+<!-- 横型フロー -->
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 15px; min-width: 900px;">
+
+<!-- INPUT -->
+<div style="text-align: center; flex-shrink: 0;">
+<div style="background: #1a1a1a; border: 1px solid #c9b037; border-radius: 10px; padding: 10px;">
+<div style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
+{"".join([f'<div style="display: flex; gap: 3px;">' + "".join([f'<div style="width: 8px; height: 8px; border-radius: 50%; background: {"#c9b037" if (i+j) % 3 == 0 else "#333"};"></div>' for j in range(n_tokens)]) + '</div>' for i in range(8)])}
+<div style="color: #666; font-size: 10px;">...</div>
+{"".join([f'<div style="display: flex; gap: 3px;">' + "".join([f'<div style="width: 8px; height: 8px; border-radius: 50%; background: {"#c9b037" if (i+j) % 2 == 0 else "#333"};"></div>' for j in range(n_tokens)]) + '</div>' for i in range(3)])}
+</div>
+</div>
+<div style="color: #c9b037; font-size: 11px; margin-top: 5px;">{p}×{n_tokens}</div>
+<div style="color: #666; font-size: 10px;">0,1,...,{p-1}</div>
+</div>
+
+<!-- Arrow -->
+<div style="color: #c9b037; font-size: 20px;">→</div>
+
+<!-- EMBED -->
+<div style="text-align: center; flex-shrink: 0;">
+<div style="color: #c9b037; font-size: 12px; margin-bottom: 5px;">EMBED</div>
+<div style="background: #1a1a1a; border: 1px solid #c9b037; border-radius: 10px; padding: 8px;">
+<div style="display: flex; flex-direction: column; gap: 1px;">
+{"".join([f'<div style="display: flex; gap: 1px;">' + "".join([f'<div style="width: 3px; height: 3px; background: {"#c9b037" if (i*j) % 5 < 3 else "#222"};"></div>' for j in range(20)]) + '</div>' for i in range(12)])}
+</div>
+</div>
+<div style="color: #666; font-size: 10px; margin-top: 3px;">{d_model}×{n_tokens}</div>
+</div>
+
+<!-- Arrow -->
+<div style="color: #c9b037; font-size: 20px;">→</div>
+
+<!-- ATTENTION -->
+<div style="text-align: center; flex-shrink: 0;">
+<div style="background: #1a1a1a; border: 1px solid #c9b037; border-radius: 10px; padding: 10px;">
+<div style="display: flex; gap: 8px; align-items: center;">
+<!-- Q, K matrices -->
+<div style="display: flex; flex-direction: column; gap: 3px;">
+<div style="display: grid; grid-template-columns: repeat(3, 8px); gap: 2px;">
+{"".join([f'<div style="width: 8px; height: 8px; background: {"#c9b037" if i == j else "#333"}; border-radius: 2px;"></div>' for i in range(3) for j in range(3)])}
+</div>
+<div style="display: grid; grid-template-columns: repeat(3, 8px); gap: 2px; margin-top: 5px;">
+{"".join([f'<div style="width: 8px; height: 8px; background: {"#c9b037" if i != j else "#333"}; border-radius: 2px;"></div>' for i in range(3) for j in range(3)])}
+</div>
+</div>
+<!-- Softmax symbol -->
+<div style="color: #c9b037; font-size: 16px;">⊗</div>
+<!-- V matrix -->
+<div style="display: grid; grid-template-columns: repeat(3, 8px); gap: 2px;">
+{"".join([f'<div style="width: 8px; height: 8px; background: {"#c9b037" if (i+j) % 2 == 0 else "#333"}; border-radius: 2px;"></div>' for i in range(4) for j in range(3)])}
+</div>
+</div>
+</div>
+<div style="color: #c9b037; font-size: 12px; margin-top: 5px;">ATTENTION</div>
+<div style="color: #666; font-size: 10px;">{n_heads} heads</div>
+</div>
+
+<!-- Arrow -->
+<div style="color: #c9b037; font-size: 20px;">→</div>
+
+<!-- MLP -->
+<div style="text-align: center; flex-shrink: 0;">
+<div style="background: #1a1a1a; border: 1px solid #c9b037; border-radius: 10px; padding: 10px;">
+<!-- Neural network visualization -->
+<svg width="80" height="60" style="display: block;">
+<!-- Input layer -->
+{"".join([f'<circle cx="10" cy="{15 + i*15}" r="4" fill="#c9b037"/>' for i in range(3)])}
+<!-- Hidden layer -->
+{"".join([f'<circle cx="40" cy="{10 + i*10}" r="4" fill="#c9b037"/>' for i in range(5)])}
+<!-- Output layer -->
+{"".join([f'<circle cx="70" cy="{15 + i*15}" r="4" fill="#c9b037"/>' for i in range(3)])}
+<!-- Connections -->
+{"".join([f'<line x1="14" y1="{15 + i*15}" x2="36" y2="{10 + j*10}" stroke="#444" stroke-width="0.5"/>' for i in range(3) for j in range(5)])}
+{"".join([f'<line x1="44" y1="{10 + i*10}" x2="66" y2="{15 + j*15}" stroke="#444" stroke-width="0.5"/>' for i in range(5) for j in range(3)])}
+</svg>
+</div>
+<div style="color: #c9b037; font-size: 11px; margin-top: 5px;">MULTILAYER</div>
+<div style="color: #c9b037; font-size: 11px;">PERCEPTRON</div>
+<div style="color: #666; font-size: 10px;">{d_model}→{d_ff}→{d_model}</div>
+</div>
+
+<!-- Arrow -->
+<div style="color: #c9b037; font-size: 20px;">→</div>
+
+<!-- UNEMBED -->
+<div style="text-align: center; flex-shrink: 0;">
+<div style="color: #c9b037; font-size: 12px; margin-bottom: 5px;">UNEMBED</div>
+<div style="background: #1a1a1a; border: 1px solid #c9b037; border-radius: 10px; padding: 8px;">
+<div style="display: flex; flex-direction: column; gap: 1px;">
+{"".join([f'<div style="display: flex; gap: 1px;">' + "".join([f'<div style="width: 3px; height: 3px; background: {"#c9b037" if j < 5 else "#222"};"></div>' for j in range(20)]) + '</div>' for i in range(12)])}
+</div>
+</div>
+<div style="color: #666; font-size: 10px; margin-top: 3px;">{d_model}→{p}</div>
+</div>
+
+<!-- Arrow -->
+<div style="color: #c9b037; font-size: 20px;">→</div>
+
+<!-- OUTPUT -->
+<div style="text-align: center; flex-shrink: 0;">
+<div style="background: #1a1a1a; border: 1px solid #c9b037; border-radius: 10px; padding: 10px;">
+<div style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
+{"".join([f'<div style="display: flex;"><div style="width: 8px; height: 8px; border-radius: 50%; background: {"#c9b037" if i == 5 else "#333"};"></div></div>' for i in range(8)])}
+<div style="color: #666; font-size: 10px;">...</div>
+{"".join([f'<div style="display: flex;"><div style="width: 8px; height: 8px; border-radius: 50%; background: #333;"></div></div>' for i in range(3)])}
+</div>
+</div>
+<div style="color: #c9b037; font-size: 11px; margin-top: 5px;">{p}×1</div>
+<div style="color: #666; font-size: 10px;">0,1,...,{p-1}</div>
+</div>
+
+</div>
+
+</div>
+""", unsafe_allow_html=True)
+
+            # 各層の役割説明
+            st.markdown(f"""
+<div style="background: #111; padding: 15px; border-radius: 10px; margin-top: 15px;">
+<table style="width: 100%; color: #c9b037; font-size: 0.9em; border-collapse: collapse;">
+<tr style="border-bottom: 1px solid #333;">
+<td style="padding: 8px;"><b>EMBED</b></td>
+<td style="padding: 8px; color: #999;">入力(0〜{p-1})を{d_model}次元ベクトルに変換 → <span style="color: #ffeaa7;">フーリエ表現 [cos(ωa), sin(ωa), ...]</span></td>
+</tr>
+<tr style="border-bottom: 1px solid #333;">
+<td style="padding: 8px;"><b>ATTENTION</b></td>
+<td style="padding: 8px; color: #999;">{n_heads}個のヘッドがQ·K^Tで関係性を計算 → <span style="color: #ffeaa7;">cos(ωa)·cos(ωb), sin(ωa)·sin(ωb)</span></td>
+</tr>
+<tr style="border-bottom: 1px solid #333;">
+<td style="padding: 8px;"><b>MLP</b></td>
+<td style="padding: 8px; color: #999;">{d_model}→{d_ff}→{d_model}の非線形変換 → <span style="color: #ffeaa7;">cos·cos - sin·sin = cos(ω(a+b))</span></td>
+</tr>
+<tr>
+<td style="padding: 8px;"><b>UNEMBED</b></td>
+<td style="padding: 8px; color: #999;">{d_model}次元から{p}クラスへ → <span style="color: #ffeaa7;">(a+b) mod {p} の確率分布</span></td>
+</tr>
+</table>
+</div>
+""", unsafe_allow_html=True)
+
+            # Attention内部の詳細図
+            st.markdown("#### 🎯 Attention機構の詳細")
+            st.markdown(f"""
+<div style="background: #1a1a2e; padding: 20px; border-radius: 10px; font-family: monospace;">
+
+<div style="display: flex; justify-content: space-around; align-items: center; flex-wrap: wrap;">
+
+<!-- Q, K, V 計算 -->
+<div style="background: #2d3436; border: 1px solid #636e72; border-radius: 8px; padding: 15px; margin: 5px; text-align: center; min-width: 150px;">
+<div style="color: #74b9ff;">入力 X</div>
+<div style="color: white; font-size: 0.9em;">[h_a, h_b]</div>
+<div style="color: #b2bec3; font-size: 0.8em;">(2, {d_model})</div>
+</div>
+
+<div style="color: #636e72; font-size: 1.5em;">→</div>
+
+<!-- Q -->
+<div style="text-align: center; margin: 5px;">
+<div style="background: #e17055; border-radius: 8px; padding: 10px; color: white; min-width: 80px;">
+<b>Q</b><br>
+<span style="font-size: 0.8em;">W_Q · X</span>
+</div>
+</div>
+
+<!-- K -->
+<div style="text-align: center; margin: 5px;">
+<div style="background: #00b894; border-radius: 8px; padding: 10px; color: white; min-width: 80px;">
+<b>K</b><br>
+<span style="font-size: 0.8em;">W_K · X</span>
+</div>
+</div>
+
+<!-- V -->
+<div style="text-align: center; margin: 5px;">
+<div style="background: #0984e3; border-radius: 8px; padding: 10px; color: white; min-width: 80px;">
+<b>V</b><br>
+<span style="font-size: 0.8em;">W_V · X</span>
+</div>
+</div>
+
+<div style="color: #636e72; font-size: 1.5em;">→</div>
+
+<!-- Attention計算 -->
+<div style="background: #2d3436; border: 2px solid #fd79a8; border-radius: 8px; padding: 15px; margin: 5px; text-align: center;">
+<div style="color: #fd79a8; font-size: 0.9em;">Attention</div>
+<div style="color: white; font-size: 0.85em; margin-top: 5px;">
+softmax(Q·K<sup>T</sup>/√d) · V
+</div>
+</div>
+
+</div>
+
+<!-- 2x2 Attention行列の説明 -->
+<div style="margin-top: 20px; display: flex; justify-content: center; gap: 30px; flex-wrap: wrap;">
+
+<div style="text-align: center;">
+<div style="color: #fd79a8; margin-bottom: 10px;"><b>Attention行列 (2×2)</b></div>
+<table style="border-collapse: collapse; background: #2d3436; color: white;">
+<tr>
+<td style="border: 1px solid #636e72; padding: 10px; background: #1a1a2e;"></td>
+<td style="border: 1px solid #636e72; padding: 10px; color: #74b9ff;"><b>K_a</b></td>
+<td style="border: 1px solid #636e72; padding: 10px; color: #74b9ff;"><b>K_b</b></td>
+</tr>
+<tr>
+<td style="border: 1px solid #636e72; padding: 10px; color: #e17055;"><b>Q_a</b></td>
+<td style="border: 1px solid #636e72; padding: 10px;">α_aa</td>
+<td style="border: 1px solid #636e72; padding: 10px; background: #fd79a8; color: black;"><b>α_ab</b></td>
+</tr>
+<tr>
+<td style="border: 1px solid #636e72; padding: 10px; color: #e17055;"><b>Q_b</b></td>
+<td style="border: 1px solid #636e72; padding: 10px; background: #fd79a8; color: black;"><b>α_ba</b></td>
+<td style="border: 1px solid #636e72; padding: 10px;">α_bb</td>
+</tr>
+</table>
+</div>
+
+<div style="text-align: left; color: #b2bec3; font-size: 0.9em; max-width: 300px;">
+<div style="color: #ffeaa7; margin-bottom: 10px;"><b>加法定理との対応:</b></div>
+• <b>α_ab</b>: aがbの情報を取り込む<br>
+  → cos(ωa) と cos(ωb) の混合<br><br>
+• <b>α_ba</b>: bがaの情報を取り込む<br>
+  → sin(ωa) と sin(ωb) の混合<br><br>
+• 出力: α_ab · V_b で積を計算
+</div>
+
+</div>
+
+</div>
+""", unsafe_allow_html=True)
+
+        # 数式とAttentionの関係を説明
+        st.markdown("""
+<div style="background: linear-gradient(135deg, rgba(102, 126, 234, 0.2), rgba(78, 205, 196, 0.2)); padding: 20px; border-radius: 12px; margin-bottom: 20px;">
+
+### 🎯 Attentionの役割：「aとbの情報を混ぜる」
+
+**加法定理** を計算するには、aとbの情報を**掛け合わせる**必要があります：
+
+$$\\cos(\\omega(a+b)) = \\underbrace{\\cos(\\omega a) \\cdot \\cos(\\omega b)}_{\\text{Attentionで混合}} - \\underbrace{\\sin(\\omega a) \\cdot \\sin(\\omega b)}_{\\text{Attentionで混合}}$$
+
+| 処理ステップ | 数式上の役割 | Attention行列の意味 |
+|:----------:|:-----------|:------------------|
+| **入力** | a, b | 2つのトークン |
+| **埋め込み** | cos(ωa), sin(ωa), cos(ωb), sin(ωb) | 各トークンのフーリエ表現 |
+| **Attention** | aがbを見る → cos(ωa)とcos(ωb)を混合 | **Attn[a→b]が高い = aがbの情報を取り込む** |
+| **出力** | cos(ωa)·cos(ωb) の計算 | 掛け算の準備完了 |
+
+</div>
+""", unsafe_allow_html=True)
+
         # 解説
-        with st.expander("📚 Attention機構の役割", expanded=False):
-            st.markdown("""
-            **Attention機構** は、Transformerの中核であり、Grokkingにおいて重要な役割を果たします。
+        with st.expander("📚 詳細: Attentionと加法定理の数学的関係", expanded=False):
+            st.markdown(r"""
+### なぜAttentionが「掛け算」を実現できるのか？
 
-            ### Attentionの働き
-            入力 `[a, b]` に対して、Attentionは以下を行います：
+**Attention機構**の出力は以下の形式です：
+$$\text{Output}_a = \sum_j \alpha_{a,j} \cdot V_j = \alpha_{a,a} \cdot V_a + \alpha_{a,b} \cdot V_b$$
 
-            1. **Query, Key, Value の計算**: 各トークンの埋め込みから Q, K, V を生成
-            2. **Attention重み**: `softmax(Q·K^T / √d)` で計算
-            3. **値の集約**: 重みで V を重み付け平均
+ここで：
+- $\alpha_{a,b}$ = Attention重み（aがbをどれだけ見るか）
+- $V_b$ = bのValue（cos(ωb), sin(ωb)を含む）
 
-            ### Grokkingでの役割
-            - **埋め込みの掛け算**: cos(ωa)·cos(ωb) や sin(ωa)·sin(ωb) を計算
-            - **情報の統合**: a と b の情報を統合
-            - **フーリエ成分の混合**: 加法定理の前半部分を担当
+**重要な洞察**：Attention重み $\alpha_{a,b}$ 自体が入力に依存するため、
+$\alpha_{a,b} \cdot V_b$ は実質的に **cos(ωa) と cos(ωb) の積** を計算できます！
 
-            ### Attentionパターンの意味
-            - **Attn[a→b]**: aがbの情報をどれだけ取り込むか
-            - **Attn[b→a]**: bがaの情報をどれだけ取り込むか
+### Attentionパターンの「縞模様」の意味
+
+Attentionマップに**周期的な縞模様**が見えるとき：
+- **縦縞**: Attentionがbの値のみに依存 → sin(ωb) や cos(ωb) に対応
+- **横縞**: Attentionがaの値のみに依存 → sin(ωa) や cos(ωa) に対応
+- **斜め縞**: Attentionが(a+b)に依存 → **加法定理の計算に成功！**
+
+### 各セクションの見方
+
+| セクション | 何を確認するか |
+|:--------:|:-------------|
+| **1️⃣ 全体マップ** | 縞模様の周期 = 学習した周波数k |
+| **2️⃣ ヘッド比較** | 各ヘッドが異なるk担当なら良い |
+| **3️⃣ 重み分布** | 0.5付近 = 均等に混合 |
+| **4️⃣ 個別サンプル** | 2x2行列で混合の様子を確認 |
+| **5️⃣ 入力依存性** | cos/sin波形が見えれば成功 |
+| **6️⃣ 入力埋め込み** | 埋め込みがフーリエ構造か |
             """)
 
         p = config["p"]
         n_tokens = config.get("n_tokens", 2)
         n_heads = config.get("n_heads", 4)
 
+        # Fourier Analysisで検出された主要周波数を取得
+        try:
+            _, dominant_freqs = plot_fourier_spectrum(analyzer)
+            expected_ks = [int(f[0]) for f in dominant_freqs[:5]]  # 上位5つ
+        except:
+            expected_ks = []
+
+        if expected_ks:
+            st.markdown(f"""
+<div style="background: linear-gradient(90deg, rgba(255, 107, 107, 0.2), rgba(255, 215, 0, 0.2)); padding: 15px; border-radius: 10px; margin-bottom: 20px;">
+<b>🎯 Fourier Analysisで検出された主要周波数:</b> <code style="font-size: 1.2em;">k = {', '.join(map(str, expected_ks))}</code><br>
+<span style="font-size: 0.9em;">これらの周波数がAttentionパターンに現れていれば、加法定理の計算に成功しています</span>
+</div>
+""", unsafe_allow_html=True)
+
         try:
             # ===== 1. 全体Attentionパターンマップ =====
             st.subheader("1️⃣ 全体Attentionパターンマップ")
-            st.markdown("全ての(a, b)ペアに対するAttention重みを可視化")
+
+            st.markdown("""
+<div style="background: rgba(102, 126, 234, 0.15); padding: 12px; border-radius: 8px; border-left: 4px solid #667EEA; margin-bottom: 15px;">
+<b>🔍 このグラフは何？</b><br>
+全ての入力ペア(a, b)に対して、「aがbの情報をどれだけ取り込むか」をヒートマップで表示。<br><br>
+<b>📐 数式との対応:</b><br>
+• <b>縦縞（周期k）</b>: Attn ∝ cos(2πkb/p) → bの周波数kを学習<br>
+• <b>横縞（周期k）</b>: Attn ∝ cos(2πka/p) → aの周波数kを学習<br>
+• <b>斜め縞</b>: Attn ∝ cos(2πk(a+b)/p) → <b>加法定理の計算に成功！</b><br><br>
+<b>✅ 良い状態</b>: k本の縞模様（k = 学習した周波数）
+</div>
+""", unsafe_allow_html=True)
 
             # サンプリング数
             sample_step = max(1, p // 30)  # 最大30x30のグリッド
@@ -2347,12 +2733,102 @@ $$\cos(2\pi \cdot 5/5) = (-0.81)(-0.81) - (0.59)(-0.59) = 0.66 + 0.35 = 1.0 = \c
             )
             st.plotly_chart(fig_map, use_container_width=True, key="attn_full_map")
 
+            # --- 周波数相関分析 ---
+            def compute_fourier_correlation(attn_map, p, n_freqs=10):
+                """Attentionマップとフーリエ基底の相関を計算"""
+                n_a, n_b = attn_map.shape
+                a_vals = np.linspace(0, p-1, n_a)
+                b_vals = np.linspace(0, p-1, n_b)
+
+                correlations = []
+                for k in range(1, min(n_freqs + 1, p // 2)):
+                    # cos(2πk·b/p) との相関（b方向）
+                    cos_b = np.cos(2 * np.pi * k * b_vals / p)
+                    row_corrs = []
+                    for row in attn_map:
+                        if np.std(row) > 1e-6:
+                            c = abs(np.corrcoef(row, cos_b)[0, 1])
+                            if not np.isnan(c):
+                                row_corrs.append(c)
+                    corr_b = np.mean(row_corrs) if row_corrs else 0
+
+                    # cos(2πk·a/p) との相関（a方向）
+                    cos_a = np.cos(2 * np.pi * k * a_vals / p)
+                    col_corrs = []
+                    for col in attn_map.T:
+                        if np.std(col) > 1e-6:
+                            c = abs(np.corrcoef(col, cos_a)[0, 1])
+                            if not np.isnan(c):
+                                col_corrs.append(c)
+                    corr_a = np.mean(col_corrs) if col_corrs else 0
+
+                    correlations.append((k, max(corr_a, corr_b), 'a' if corr_a > corr_b else 'b'))
+
+                return sorted(correlations, key=lambda x: x[1], reverse=True)
+
+            top_freqs = compute_fourier_correlation(attn_map, p, n_freqs=15)
+
+            st.markdown("""
+<div style="background: rgba(255, 215, 0, 0.2); padding: 12px; border-radius: 8px; border-left: 4px solid #FFD700; margin-top: 10px;">
+<b>📊 Attentionで検出された周波数（相関順）:</b>
+</div>
+""", unsafe_allow_html=True)
+
+            freq_cols = st.columns(5)
+            for i, (k, corr, direction) in enumerate(top_freqs[:5]):
+                with freq_cols[i]:
+                    # 期待される周波数との一致をチェック
+                    is_expected = k in expected_ks if expected_ks else False
+                    if is_expected and corr >= 0.3:
+                        status = "🎯"  # 期待通り
+                    elif corr >= 0.5:
+                        status = "✅"
+                    elif corr >= 0.3:
+                        status = "🟡"
+                    else:
+                        status = ""
+                    dir_text = f"(∝cos(ω{direction}))"
+                    label = f"k={k}" + (" ⭐" if is_expected else "")
+                    st.metric(label, f"{corr:.2f} {status}", dir_text)
+
+            # 期待される周波数との一致状況
+            detected_ks = set([k for k, corr, _ in top_freqs[:10] if corr >= 0.3])
+            if expected_ks:
+                matched = detected_ks.intersection(set(expected_ks))
+                match_rate = len(matched) / len(expected_ks) * 100
+                if match_rate >= 80:
+                    st.success(f"✅ 優秀: 期待周波数の{match_rate:.0f}%がAttentionで検出（{sorted(matched)}）")
+                elif match_rate >= 50:
+                    st.info(f"🟡 良好: 期待周波数の{match_rate:.0f}%がAttentionで検出（{sorted(matched)}）")
+                else:
+                    st.warning(f"⚠️ 注意: 期待周波数の{match_rate:.0f}%のみ検出（期待: {expected_ks}, 検出: {sorted(detected_ks)}）")
+
             # ===== 2. ヘッド別Attentionパターン比較 =====
             st.subheader("2️⃣ 全ヘッドのAttentionパターン比較")
-            st.markdown("各ヘッドがどのような役割を持っているかを比較")
+
+            st.markdown("""
+<div style="background: rgba(78, 205, 196, 0.15); padding: 12px; border-radius: 8px; border-left: 4px solid #4ECDC4; margin-bottom: 15px;">
+<b>🔍 このグラフは何？</b><br>
+各Attentionヘッドが学習したパターンを並べて比較。<br><br>
+<b>📐 数式との対応:</b><br>
+加法定理には<b>複数の周波数k</b>が関与します：<br>
+• <b>Head 0</b>: 周波数 k=1 を担当 → cos(2π·1·x/p) のパターン<br>
+• <b>Head 1</b>: 周波数 k=2 を担当 → cos(2π·2·x/p) のパターン<br>
+• ...<br><br>
+<b>✅ 良い状態</b>: 各ヘッドが<b>異なる縞の本数</b>（異なる周波数k）を持つ<br>
+<b>❌ 悪い状態</b>: 全ヘッドが同じパターン（役割分担できていない）
+</div>
+""", unsafe_allow_html=True)
 
             n_heads_actual = all_attn.shape[1]
             cols = st.columns(n_heads_actual)
+
+            # 各ヘッドの担当周波数を計算
+            head_freqs = []
+            for h in range(n_heads_actual):
+                attn_h = all_attn[:, h, 0, 1].reshape(n_a, n_b)
+                freqs = compute_fourier_correlation(attn_h, p, n_freqs=10)
+                head_freqs.append(freqs)
 
             for h in range(n_heads_actual):
                 with cols[h]:
@@ -2363,8 +2839,13 @@ $$\cos(2\pi \cdot 5/5) = (-0.81)(-0.81) - (0.59)(-0.59) = 0.66 + 0.35 = 1.0 = \c
                         colorscale="Viridis",
                         showscale=False
                     ))
+
+                    # 担当周波数をタイトルに表示
+                    top_k, top_corr, _ = head_freqs[h][0] if head_freqs[h] else (0, 0, 'b')
+                    title_text = f"Head {h} (k={top_k})"
+
                     fig_h.update_layout(
-                        title=f"Head {h}",
+                        title=title_text,
                         height=200,
                         margin=dict(l=10, r=10, t=40, b=10),
                         xaxis=dict(showticklabels=False, title="b"),
@@ -2372,13 +2853,60 @@ $$\cos(2\pi \cdot 5/5) = (-0.81)(-0.81) - (0.59)(-0.59) = 0.66 + 0.35 = 1.0 = \c
                     )
                     st.plotly_chart(fig_h, use_container_width=True, key=f"attn_head_map_{h}")
 
-                    # 統計情報
+                    # 統計情報 + 周波数相関（期待周波数との一致を強調）
                     mean_val = attn_h.mean()
                     std_val = attn_h.std()
-                    st.caption(f"mean={mean_val:.3f}, std={std_val:.3f}")
+                    is_expected = top_k in expected_ks if expected_ks else False
+                    if is_expected and top_corr >= 0.3:
+                        status = "🎯"
+                    elif top_corr >= 0.5:
+                        status = "✅"
+                    elif top_corr >= 0.3:
+                        status = "🟡"
+                    else:
+                        status = ""
+                    expected_mark = " ⭐" if is_expected else ""
+                    st.caption(f"k={top_k}{expected_mark}: corr={top_corr:.2f} {status}")
+
+            # ヘッド間周波数分担の要約
+            unique_ks = set([head_freqs[h][0][0] for h in range(n_heads_actual) if head_freqs[h]])
+            all_ks = [head_freqs[h][0][0] for h in range(n_heads_actual) if head_freqs[h]]
+
+            # 期待周波数との一致も考慮
+            if expected_ks:
+                matched_in_heads = unique_ks.intersection(set(expected_ks))
+                unmatched_expected = set(expected_ks) - unique_ks
+
+                st.markdown(f"""
+<div style="background: rgba(78, 205, 196, 0.15); padding: 10px; border-radius: 8px; margin-top: 10px;">
+<b>📊 ヘッド別周波数分担:</b><br>
+• <b>担当周波数</b>: k = {sorted(unique_ks)}<br>
+• <b>期待周波数と一致</b>: k = {sorted(matched_in_heads)} {"🎯" if matched_in_heads else ""}<br>
+• <b>未カバーの期待周波数</b>: k = {sorted(unmatched_expected) if unmatched_expected else "なし ✅"}
+</div>
+""", unsafe_allow_html=True)
+            else:
+                if len(unique_ks) == len(all_ks):
+                    st.success(f"✅ 良好: 全ヘッドが異なる周波数を担当（k={sorted(unique_ks)}）")
+                elif len(unique_ks) >= n_heads_actual * 0.5:
+                    st.info(f"🟡 概ね良好: {len(unique_ks)}/{n_heads_actual} ヘッドが異なる周波数（k={sorted(unique_ks)}）")
+                else:
+                    st.warning(f"⚠️ 注意: 複数ヘッドが同じ周波数を担当（k={all_ks}）")
 
             # ===== 3. Attention重み分布 =====
             st.subheader("3️⃣ Attention重み分布")
+
+            st.markdown("""
+<div style="background: rgba(255, 215, 0, 0.15); padding: 12px; border-radius: 8px; border-left: 4px solid #FFD700; margin-bottom: 15px;">
+<b>🔍 見方:</b><br>
+• <b>左: ヒストグラム</b>: Attention重みの分布を確認<br>
+  - 0.5付近にピーク = 均等な注意配分<br>
+  - 0または1に偏り = 強いコピー/無視<br>
+• <b>右: ヘッド間相関</b>: ヘッド同士の類似度<br>
+  - 低相関（青） = 異なる役割 ✅<br>
+  - 高相関（赤） = 似た役割（冗長かも）
+</div>
+""", unsafe_allow_html=True)
 
             col1, col2 = st.columns(2)
 
@@ -2427,6 +2955,23 @@ $$\cos(2\pi \cdot 5/5) = (-0.81)(-0.81) - (0.59)(-0.59) = 0.66 + 0.35 = 1.0 = \c
 
             # ===== 4. 個別サンプル分析 =====
             st.subheader("4️⃣ 個別サンプル分析")
+
+            st.markdown("""
+<div style="background: rgba(255, 107, 107, 0.15); padding: 12px; border-radius: 8px; border-left: 4px solid #FF6B6B; margin-bottom: 15px;">
+<b>🔍 このグラフは何？</b><br>
+特定の(a, b)ペアに対する2×2 Attention行列を表示。<br><br>
+<b>📐 2×2行列の意味:</b>
+<pre style="background: rgba(0,0,0,0.2); padding: 8px; border-radius: 4px; margin: 8px 0;">
+        Key: a    Key: b
+Query a [ α_aa    α_ab ]  ← aの出力 = α_aa·V_a + α_ab·V_b
+Query b [ α_ba    α_bb ]  ← bの出力 = α_ba·V_a + α_bb·V_b
+</pre>
+<b>加法定理の計算では</b>: α_ab（aがbを見る）が重要！<br>
+• <b>α_ab ≈ 0.5</b>: aとbの情報を均等に混合<br>
+• <b>α_ab ≈ 1.0</b>: aがbの情報のみを使用（コピー）<br>
+• <b>α_ab ≈ 0.0</b>: aがbの情報を無視
+</div>
+""", unsafe_allow_html=True)
 
             col_a, col_b = st.columns(2)
             with col_a:
@@ -2516,6 +3061,19 @@ $$\cos(2\pi \cdot 5/5) = (-0.81)(-0.81) - (0.59)(-0.59) = 0.66 + 0.35 = 1.0 = \c
             # ===== 5. aまたはbを固定した時のAttention変化 =====
             st.subheader("5️⃣ 入力値によるAttention変化")
 
+            st.markdown("""
+<div style="background: rgba(78, 205, 196, 0.15); padding: 12px; border-radius: 8px; border-left: 4px solid #4ECDC4; margin-bottom: 15px;">
+<b>🔍 このグラフは何？</b><br>
+一方を固定して他方を変化させた時、Attentionがどう変わるかを表示。<br><br>
+<b>📐 数式との対応（重要！）:</b><br>
+• <b>左グラフ（aを固定）</b>: Attn(a=固定, b) ∝ cos(ωb) または sin(ωb)<br>
+  → <b>周期kの波形が見えれば、周波数kを学習している証拠</b><br>
+• <b>右グラフ（bを固定）</b>: Attn(a, b=固定) ∝ cos(ωa) または sin(ωa)<br><br>
+<b>✅ 良い状態</b>: きれいなcos/sin波形（周期 = p/k サンプル）<br>
+<b>💡 ヒント</b>: 各ヘッドが異なる周波数の波形を持っていれば、役割分担OK
+</div>
+""", unsafe_allow_html=True)
+
             col1, col2 = st.columns(2)
 
             with col1:
@@ -2577,6 +3135,16 @@ $$\cos(2\pi \cdot 5/5) = (-0.81)(-0.81) - (0.59)(-0.59) = 0.66 + 0.35 = 1.0 = \c
 
             # ===== 6. 埋め込みの可視化 =====
             st.subheader("6️⃣ 入力埋め込み")
+
+            st.markdown("""
+<div style="background: rgba(102, 126, 234, 0.15); padding: 12px; border-radius: 8px; border-left: 4px solid #667EEA; margin-bottom: 15px;">
+<b>🔍 見方:</b><br>
+• <b>バーグラフ</b>: 各トークン(a, b)の埋め込みベクトルの各次元の値<br>
+• <b>フーリエ表現を学習</b>: 特定の次元がcos/sin波形に対応<br><br>
+💡 <b>ヒント</b>: aとbで異なる次元が活性化していれば、情報が分離されている
+</div>
+""", unsafe_allow_html=True)
+
             embed_key = "embed"
             if embed_key in intermediates:
                 embeddings = intermediates[embed_key][0].numpy()
@@ -2605,25 +3173,29 @@ $$\cos(2\pi \cdot 5/5) = (-0.81)(-0.81) - (0.59)(-0.59) = 0.66 + 0.35 = 1.0 = \c
     with tab8:
         st.header("🧠 MLP Neuron Analysis")
 
-        with st.expander("📚 MLPニューロンの役割", expanded=False):
+        with st.expander("📚 MLPニューロンの役割と見方", expanded=False):
             st.markdown("""
-            **MLP (Multi-Layer Perceptron)** はTransformerの各ブロック内にあり、
-            Grokkingにおいて**加法定理の計算**を担当します。
+### このタブの見方（4セクション）
 
-            ### MLPの構造
-            ```
-            入力 → Linear(d_model → d_ff) → GELU → Linear(d_ff → d_model) → 出力
-            ```
+| セクション | 目的 | 見るべきポイント |
+|:--------:|:-----|:----------------|
+| **1️⃣ 重みの構造** | MLP層のパラメータ情報 | サイズ、統計情報の確認 |
+| **2️⃣ 活性化パターン** | 入力(a,b)に対する反応 | **斜め縞 = 良い**（a+bに依存）|
+| **3️⃣ フーリエ相関** | 各ニューロンと理論cos/sinの相関 | **高相関のニューロンが多い = 良い** |
+| **4️⃣ 波形比較** | 個別ニューロンの詳細波形 | 理論波形との一致度を確認 |
 
-            ### Grokkingでの役割
-            - **cos·cos と sin·sin の掛け算**: Attention後の表現を処理
-            - **引き算**: cos(ω(a+b)) = cos·cos - sin·sin を計算
-            - **周波数ごとの処理**: 異なるニューロンが異なる周波数kを担当
+### ヒートマップの色の意味
+- **カラースケール RdBu**: 赤=正の活性化、青=負の活性化
 
-            ### ニューロンの見方
-            - **活性化パターン**: 入力(a,b)に対してどう反応するか
-            - **周波数選択性**: 特定のkに対応するcos/sinパターンを持つか
-            - **フーリエ相関**: 理論的なcos(2πkn/p)との相関
+### MLPの構造
+```
+入力 → Linear(d_model → d_ff) → GELU → Linear(d_ff → d_model) → 出力
+```
+
+### Grokkingでの役割
+- **cos·cos と sin·sin の掛け算**: Attention後の表現を処理
+- **引き算**: cos(ω(a+b)) = cos·cos - sin·sin を計算
+- **周波数ごとの処理**: 異なるニューロンが異なる周波数kを担当
             """)
 
         p = config["p"]
@@ -2653,7 +3225,16 @@ $$\cos(2\pi \cdot 5/5) = (-0.81)(-0.81) - (0.59)(-0.59) = 0.66 + 0.35 = 1.0 = \c
 
             # ===== 2. ニューロン活性化パターン =====
             st.subheader("2️⃣ ニューロン活性化パターン")
-            st.markdown("各ニューロンが入力(a, b)に対してどのように活性化するか")
+
+            st.markdown("""
+<div style="background: rgba(255, 215, 0, 0.15); padding: 12px; border-radius: 8px; border-left: 4px solid #FFD700; margin-bottom: 15px;">
+<b>🔍 見方:</b><br>
+• <b>斜め45°の縞模様</b>: ✅ 良い状態 - a+bに依存（モジュラ加算を学習）<br>
+• <b>縦縞 or 横縞</b>: 🟡 注意 - aのみ or bのみに依存<br>
+• <b>ランダムなノイズ</b>: ❌ 悪い状態 - 構造を学習していない<br><br>
+💡 <b>色の意味</b>: RdBuスケール（赤=正の活性化、青=負の活性化）
+</div>
+""", unsafe_allow_html=True)
 
             # サンプル入力で活性化を計算
             @st.cache_data
@@ -2722,7 +3303,18 @@ $$\cos(2\pi \cdot 5/5) = (-0.81)(-0.81) - (0.59)(-0.59) = 0.66 + 0.35 = 1.0 = \c
 
             # ===== 3. ニューロンのフーリエ相関 =====
             st.subheader("3️⃣ ニューロンのフーリエ相関")
-            st.markdown("各ニューロンがどの周波数kに対応しているか")
+
+            st.markdown("""
+<div style="background: rgba(78, 205, 196, 0.15); padding: 12px; border-radius: 8px; border-left: 4px solid #4ECDC4; margin-bottom: 15px;">
+<b>🔍 見方:</b><br>
+• <b>左: 相関ヒートマップ</b>: 各ニューロンが対応する周波数k<br>
+• <b>右: 周波数ごとの最大相関</b>: その周波数を担当するニューロンがいるか<br><br>
+<b>📊 判定基準:</b><br>
+• <b>corr ≥ 0.7 (オレンジ)</b>: ✅ その周波数を強く学習<br>
+• <b>corr < 0.7 (青)</b>: 🟡 弱い対応<br><br>
+💡 <b>理想</b>: 各周波数kに対応するニューロンが存在する
+</div>
+""", unsafe_allow_html=True)
 
             if ff_out is not None:
                 # 各ニューロンの出力とフーリエ基底の相関を計算
@@ -2816,6 +3408,18 @@ $$\cos(2\pi \cdot 5/5) = (-0.81)(-0.81) - (0.59)(-0.59) = 0.66 + 0.35 = 1.0 = \c
 
             # ===== 4. 個別ニューロン波形 =====
             st.subheader("4️⃣ 個別ニューロン波形")
+
+            st.markdown("""
+<div style="background: rgba(102, 126, 234, 0.15); padding: 12px; border-radius: 8px; border-left: 4px solid #667EEA; margin-bottom: 15px;">
+<b>🔍 見方:</b><br>
+• <b>左: 波形比較</b>: ニューロン活性化（緑）と理論cos/sin（青/赤）の比較<br>
+• <b>右: リサージュ</b>: cos/sinニューロンペアの位相関係<br><br>
+<b>📊 判定基準:</b><br>
+• <b>波形が一致</b>: ✅ そのニューロンは周波数kを正確に学習<br>
+• <b>リサージュが円形</b>: ✅ cos/sinペアが正しく存在<br><br>
+💡 上位相関ニューロンを選択して詳細を確認できます
+</div>
+""", unsafe_allow_html=True)
 
             if neuron_acts is not None:
                 n_neurons_total = neuron_acts.shape[1]
