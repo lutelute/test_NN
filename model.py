@@ -46,7 +46,8 @@ class TransformerBlock(nn.Module):
 
     def forward(self, x, return_intermediates: bool = False):
         # Self-attention with residual
-        attn_out, attn_weights = self.attention(x, x, x)
+        # average_attn_weights=False でヘッドごとのAttention重みを取得
+        attn_out, attn_weights = self.attention(x, x, x, average_attn_weights=False)
         post_attn = self.ln1(x + self.dropout(attn_out))
 
         # Feed-forward with residual

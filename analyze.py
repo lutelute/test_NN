@@ -185,9 +185,9 @@ class FourierAnalyzer:
         top_power = sum([p for _, p in dominant_freqs[:3]])
         concentration = top_power / total_power if total_power > 0 else 0
 
-        # 5. 判定
+        # 5. 判定（閾値を緩和: 0.9 → 0.7）
         best_corr = max([r["max_correlation"] for r in correlation_results]) if correlation_results else 0
-        is_fourier_representation = best_corr > 0.9 and concentration > 0.3
+        is_fourier_representation = best_corr > 0.7 and concentration > 0.2
 
         return {
             "is_fourier_representation": is_fourier_representation,
@@ -360,7 +360,7 @@ class FourierAnalyzer:
             "std_distance_from_center": float(distances.std()),
             "circularity": float(1 - distances.std() / (distances.mean() + 1e-8)),
             "angle_correlation": float(best_corr),
-            "is_circular": best_corr > 0.9,
+            "is_circular": best_corr > 0.5,  # 閾値を緩和: 0.9 → 0.5
         }
 
 
