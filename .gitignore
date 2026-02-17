@@ -10,6 +10,10 @@ venv/
 checkpoints*/
 *.pt
 
+# Precomputed data (tracked for Streamlit Cloud)
+!precomputed_data/
+!precomputed_data/**
+
 # Figures (generated)
 figures*/
 
